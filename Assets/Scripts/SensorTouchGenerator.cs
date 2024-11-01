@@ -21,6 +21,8 @@ public class SensorTouchGenerator : MonoBehaviour
 
     public SensorTouchHandler sensorTouchHandler;
 
+    private Vector2 parsedPosition;
+
     void Start()
     {
         coordinateConverter = new CoordinateConverter(frontRight, frontLeft, backRight, backLeft);
@@ -35,11 +37,10 @@ public class SensorTouchGenerator : MonoBehaviour
             while (true)
             {
                 var result = await udpClient.ReceiveAsync();
-                Vector2 parsedPosition = ParsePosition(Encoding.UTF8.GetString(result.Buffer));
-                if (parsedPosition != Vector2.zero)
-                {
-                    positionQueue.Enqueue(parsedPosition);
-                }
+                parsedPosition = ParsePosition(Encoding.UTF8.GetString(result.Buffer));
+
+                positionQueue.Enqueue(parsedPosition);
+
             }
         });
     }
@@ -48,8 +49,7 @@ public class SensorTouchGenerator : MonoBehaviour
     {
         while (positionQueue.TryDequeue(out Vector2 position))
         {
-            Vector2 screenPosition = coordinateConverter.ToScreenPosition(position);
-            SensorTouch sensorTouch = new SensorTouch(0, screenPosition, Vector2.zero, 0, TouchPhase.Began, TouchType.Direct, true);
+            SensorTouch sensorTouch = new SensorTouch(0, parsedPosition, Vector2.zero, 0, TouchPhase.Began, TouchType.Direct, true);
             sensorTouchHandler.ProcessSensorTouch(sensorTouch);
         }
     }
@@ -67,9 +67,13 @@ public class SensorTouchGenerator : MonoBehaviour
             int id = int.Parse(values[0]);
             float distance = float.Parse(values[1]);
 
-            if (Mathf.Approximately(distance, 10.0f)) continue;
-
-            return CalculateBeamDetection(id, distance);
+            Vector2 detectedPosition = CalculateBeamDetection(id, distance);
+            Vector2 screenPosition = coordinateConverter.ToScreenPosition(detectedPosition);
+            if(screenPosition != Vector2.zero)
+            {
+                Debug.Log($"Obstacle detected at beam {id} with distance {distance} meters.");
+                return screenPosition;
+            }
         }
         return Vector2.zero;
     }
@@ -79,5 +83,10 @@ public class SensorTouchGenerator : MonoBehaviour
         float angle = Mathf.Lerp(-135f, 135f, (float)id / 1080);
         float radian = angle * Mathf.Deg2Rad;
         return new Vector2(-Mathf.Sin(radian) * distance, Mathf.Cos(radian) * distance);
+    }
+
+    private void OnDestroy()
+    {
+        udpClient.Close();
     }
 }

@@ -31,6 +31,13 @@ public class CoordinateConverter
         float screenX = normalizedX * screenResolution.x;
         float screenY = normalizedY * screenResolution.y;
 
-        return new Vector2(screenX, screenY);
+        if(screenX >0 && screenX < screenResolution.x && screenY>0 && screenY<screenResolution.y)
+        {
+            return new Vector2(screenX, screenY);
+        }
+        else
+        {
+            return Vector2.zero;
+        }
     }
 }
